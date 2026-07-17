@@ -1,0 +1,22 @@
+{
+  "vps_host": "IP_DA_VPS",
+  "vps_porta": 22,
+  "usuario": "root",
+  "senha": "COLOQUE_A_SENHA_AQUI",
+  "keepalive_segundos": 30,
+  "alerta_sonoro": true,
+
+  "servidor": {
+    "porta_remota": 5433,
+    "host_local": "localhost",
+    "porta_local": 5432
+  },
+
+  "cliente": {
+    "porta_local": 5433,
+    "host_destino": "localhost",
+    "porta_destino": 5432,
+    "porta_verificacao_tunel": 5433,
+    "intervalo_verificacao_segundos": 30
+  }
+}
