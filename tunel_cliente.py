@@ -34,6 +34,7 @@ from comum import (
     conectar_ssh,
     definir_titulo,
     encaminhar,
+    banco_responde_pelo_tunel,
     fmt_duracao,
     vigiar_transporte,
 )
@@ -211,14 +212,9 @@ def monitorar_tunel_base(cfg, estado, registro):
         if time.time() < proximo:
             continue
 
-        try:
-            canal = transporte.open_channel(
-                "direct-tcpip", ("localhost", porta), ("127.0.0.1", 0), timeout=10
-            )
-            canal.close()
-            online = True
-        except Exception:
-            online = False
+        # Nao basta abrir a porta: um tunel morto aceita a conexao e nunca responde
+        # (foi o que aconteceu em 16/11). Confere se o Postgres RESPONDE de fato.
+        online = banco_responde_pelo_tunel(transporte, "localhost", porta)
 
         anterior = estado.tunel_base
         estado.tunel_base = online
@@ -307,15 +303,14 @@ def diagnostico(cfg):
     console.print(
         f"[cyan]2/2[/cyan] Verificando o tunel do servidor (VPS porta {porta})..."
     )
-    try:
-        canal = transporte.open_channel(
-            "direct-tcpip", ("localhost", porta), ("127.0.0.1", 0), timeout=10
-        )
-        canal.close()
-        console.print("[bold green]TUNEL DO SERVIDOR: ONLINE[/bold green]")
+    if banco_responde_pelo_tunel(transporte, "localhost", porta):
+        console.print("[bold green]TUNEL DO SERVIDOR: ONLINE (o banco respondeu)[/bold green]")
         resultado = 0
-    except Exception as exc:
-        console.print(f"[bold red]TUNEL DO SERVIDOR: FORA DO AR[/bold red] ({exc})")
+    else:
+        console.print(
+            "[bold red]TUNEL DO SERVIDOR: FORA DO AR[/bold red] "
+            "(porta fechada ou aberta sem o banco responder)"
+        )
         resultado = 1
 
     cliente.close()
@@ -323,8 +318,8 @@ def diagnostico(cfg):
 
 
 def main():
-    definir_titulo("Tunel - Cliente (seu PC -> VPS)")
     cfg = carregar_config()
+    definir_titulo(cfg.get("nome", "Tunel - Cliente (seu PC -> VPS)"))
 
     if "--diagnostico" in sys.argv:
         raise SystemExit(diagnostico(cfg))

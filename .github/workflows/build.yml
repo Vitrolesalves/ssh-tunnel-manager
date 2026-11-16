@@ -1,0 +1,56 @@
+name: Gerar executaveis
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [master]
+    paths:
+      - "*.py"
+      - "requirements.txt"
+      - ".github/workflows/build.yml"
+
+jobs:
+  build:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Instalar dependencias
+        run: pip install -r requirements.txt
+
+      - name: Gerar TunelServidor.exe e TunelCliente.exe
+        run: |
+          pyinstaller --onefile --clean --noconfirm --name TunelServidor tunel_servidor.py
+          pyinstaller --onefile --clean --noconfirm --name TunelCliente tunel_cliente.py
+
+      - name: Teste de fumaca (o exe abre e pede o config.json)
+        shell: pwsh
+        run: |
+          foreach ($exe in "TunelServidor", "TunelCliente") {
+            $saida = & ".\dist\$exe.exe" 2>&1 | Out-String
+            Write-Host $saida
+            if ($saida -notmatch "config.json nao encontrado") { throw "$exe nao abriu como esperado" }
+          }
+
+      - name: Montar pacotes (exe + config de exemplo)
+        shell: pwsh
+        run: |
+          foreach ($exe in "TunelServidor", "TunelCliente") {
+            New-Item -ItemType Directory -Path "pacote\$exe" | Out-Null
+            Copy-Item "dist\$exe.exe" "pacote\$exe\"
+            Copy-Item config.exemplo.json "pacote\$exe\config.exemplo.json"
+          }
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: TunelServidor
+          path: pacote/TunelServidor/*
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: TunelCliente
+          path: pacote/TunelCliente/*

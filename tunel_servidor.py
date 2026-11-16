@@ -32,6 +32,7 @@ from comum import (
     definir_titulo,
     encaminhar,
     fmt_duracao,
+    vigiar_caminho_completo,
     vigiar_transporte,
 )
 
@@ -161,12 +162,17 @@ def rodar(cfg, estado, registro):
             msg = str(exc) or type(exc).__name__
             if "forward" in msg.lower() or "denied" in msg.lower():
                 registro.add(
-                    f"VPS recusou a porta {srv['porta_remota']} - ja deve existir "
-                    "outro tunel ativo usando essa porta (feche o ssh manual antigo)",
+                    f"VPS recusou a porta {srv['porta_remota']} - ainda ha uma sessao antiga "
+                    "segurando a porta (a VPS a derruba sozinha em ~90 s) ou outro tunel "
+                    "ativo nela. Tentando de novo em poucos segundos.",
                     "bold red",
                 )
-            else:
-                registro.add(f"Falha ao conectar: {msg}", "red")
+                # Sessao zumbi some sozinha em ~90 s: nao adianta esperar ate 60 s
+                # entre tentativas (backoff), tenta a cada poucos segundos.
+                espera = 3
+                aguardar(estado, cfg.get("espera_porta_ocupada_segundos", 8))
+                continue
+            registro.add(f"Falha ao conectar: {msg}", "red")
             espera = aguardar(estado, espera)
             continue
 
@@ -186,6 +192,21 @@ def rodar(cfg, estado, registro):
 
         threading.Thread(
             target=vigiar_transporte, args=(transporte, registro), daemon=True
+        ).start()
+        # Teste de ponta a ponta (VPS -> tunel -> banco) a cada 30 s: pega o caso em
+        # que a conexao SSH esta viva mas o banco nao responde pelo tunel.
+        threading.Thread(
+            target=vigiar_caminho_completo,
+            args=(
+                transporte,
+                registro,
+                "127.0.0.1",
+                srv["porta_remota"],
+                srv["host_local"],
+                srv["porta_local"],
+                int(srv.get("intervalo_verificacao_segundos", 30)),
+            ),
+            daemon=True,
         ).start()
 
         try:
@@ -244,8 +265,8 @@ def diagnostico(cfg):
 
 
 def main():
-    definir_titulo("Tunel - Servidor (base -> VPS)")
     cfg = carregar_config()
+    definir_titulo(cfg.get("nome", "Tunel - Servidor (base -> VPS)"))
 
     if "--diagnostico" in sys.argv:
         raise SystemExit(diagnostico(cfg))

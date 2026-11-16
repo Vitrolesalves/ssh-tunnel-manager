@@ -5,11 +5,14 @@
   "senha": "COLOQUE_A_SENHA_AQUI",
   "keepalive_segundos": 30,
   "alerta_sonoro": true,
+  "nome": "Tunel - Servidor (base -> VPS)",
+  "espera_porta_ocupada_segundos": 8,
 
   "servidor": {
     "porta_remota": 5433,
     "host_local": "localhost",
-    "porta_local": 5432
+    "porta_local": 5432,
+    "intervalo_verificacao_segundos": 30
   },
 
   "cliente": {
