@@ -35,6 +35,7 @@ jobs:
             Write-Host $saida
             if ($saida -notmatch "config.json nao encontrado") { throw "$exe nao abriu como esperado" }
           }
+          $global:LASTEXITCODE = 0
 
       - name: Montar pacotes (exe + config de exemplo)
         shell: pwsh
